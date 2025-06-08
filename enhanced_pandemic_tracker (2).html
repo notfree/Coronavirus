@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Pandemic Network</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(90deg, #2c3e50 0%, #34495e 100%);
+            padding: 10px 20px;
+            border-bottom: 2px solid #3498db;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ecf0f1;
+            margin: 0;
+        }
+
+        .header-info {
+            display: flex;
+            gap: 30px;
+            font-size: 12px;
+            color: #bdc3c7;
+        }
+
+        .main-container {
+            display: grid;
+            grid-template-columns: 250px 1fr 300px;
+            height: calc(100vh - 60px);
+        }
+
+        .sidebar-left, .sidebar-right {
+            background: #2c3e50;
+            border-right: 1px solid #34495e;
+            overflow-y: auto;
+        }
+
+        .sidebar-right {
+            border-left: 1px solid #34495e;
+            border-right: none;
+        }
+
+        .map-container {
+            background: #1a1a1a;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #worldMap {
+            width: 100%;
+            height: 100%;
+            background: #1a1a1a;
+            cursor: grab;
+        }
+
+        .sidebar-section {
+            border-bottom: 1px solid #34495e;
+        }
+
+        .section-header {
+            background: #34495e;
+            padding: 12px 15px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #ecf0f1;
+            border-bottom: 1px solid #2c3e50;
+        }
+
+        .section-content {
+            padding: 15px;
+        }
+
+        .btn {
+            padding: 8px 12px;
+            background: #34495e;
+            border: 1px solid #4a5f7a;
+            color: #ecf0f1;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            margin-bottom: 5px;
+            display: block;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #4a5f7a;
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: #34495e;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #4a5f7a;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: #95a5a6;
+            text-transform: uppercase;
+        }
+
+        .cases { color: #e74c3c; }
+        .recovered { color: #27ae60; }
+        .deaths { color: #8e44ad; }
+        .day { color: #3498db; }
+
+        .country {
+            fill: #2c5aa0;
+            stroke: #34495e;
+            stroke-width: 0.5;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .country:hover {
+            stroke: #3498db;
+            stroke-width: 1.5;
+            fill: #3d6bb3;
+        }
+
+        .city-marker {
+            fill: #f39c12;
+            stroke: #ffffff;
+            stroke-width: 1;
+            cursor: pointer;
+        }
+
+        .city-infected {
+            fill: #e74c3c;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { r: 4; opacity: 1; }
+            50% { r: 8; opacity: 0.6; }
+            100% { r: 4; opacity: 1; }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(44, 62, 80, 0.95);
+            color: #ecf0f1;
+            padding: 12px;
+            border-radius: 6px;
+            pointer-events: none;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+            border: 1px solid #3498db;
+            max-width: 280px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 18px;
+            color: #3498db;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 1000;
+        }
+
+        .zoom-btn {
+            width: 35px;
+            height: 35px;
+            background: rgba(44, 62, 80, 0.9);
+            border: 1px solid #3498db;
+            color: #ecf0f1;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: #3498db;
+        }
+
+        .news-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #34495e;
+            font-size: 11px;
+        }
+
+        .news-time {
+            color: #95a5a6;
+            font-size: 9px;
+            margin-top: 2px;
+        }
+
+        .parameter-slider {
+            margin: 10px 0;
+        }
+
+        .parameter-label {
+            font-size: 11px;
+            color: #bdc3c7;
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .slider {
+            width: 100%;
+            height: 4px;
+            background: #34495e;
+            outline: none;
+            border-radius: 2px;
+            appearance: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #3498db;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #34495e;
+            border: 1px solid #4a5f7a;
+            color: #ecf0f1;
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            font-size: 11px;
+            color: #bdc3c7;
+            margin-bottom: 8px;
+            display: block;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .transport-route {
+            stroke: #95a5a6;
+            stroke-width: 1;
+            fill: none;
+            opacity: 0.6;
+        }
+
+        .air-route {
+            stroke: #3498db;
+            stroke-dasharray: 3,3;
+        }
+
+        .ship-route {
+            stroke: #1abc9c;
+            stroke-width: 2;
+        }
+
+        .train-route {
+            stroke: #f39c12;
+        }
+
+        .road-route {
+            stroke: #95a5a6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Global Pandemic Network</h1>
+        <div class="header-info">
+            <span>Real-time infection tracking</span>
+            <span id="currentTime"></span>
+            <span id="zoomLevel">Zoom: Global</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar-left">
+            <div class="sidebar-section">
+                <div class="section-header">CDC Virus Presets</div>
+                <div class="section-content">
+                    <div class="btn" onclick="loadVirusPreset('covid19')">COVID-19</div>
+                    <div class="btn" onclick="loadVirusPreset('influenza')">Seasonal Flu</div>
+                    <div class="btn" onclick="loadVirusPreset('ebola')">Ebola</div>
+                    <div class="btn" onclick="loadVirusPreset('sars')">SARS</div>
+                    <div class="btn" onclick="loadVirusPreset('measles')">Measles</div>
+                </div>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="section-header">Transportation</div>
+                <div class="section-content">
+                    <label><input type="checkbox" id="showAirRoutes" checked onchange="toggleTransport('air')"> ✈️ Air Routes</label>
+                    <label><input type="checkbox" id="showShipRoutes" checked onchange="toggleTransport('ship')"> 🚢 Sea Routes</label>
+                    <label><input type="checkbox" id="showTrainRoutes" onchange="toggleTransport('train')"> 🚊 Rail Routes</label>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-header">Recent Outbreaks</div>
+                <div class="section-content" id="outbreakList">
+                    <div class="news-item">
+                        <div>Beijing, China - 50 cases</div>
+                        <div class="news-time">Day 0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div id="loading" class="loading">🌍 Loading Global Map...</div>
+            <div class="zoom-controls">
+                <div class="zoom-btn" onclick="zoomIn()">+</div>
+                <div class="zoom-btn" onclick="zoomOut()">−</div>
+                <div class="zoom-btn" onclick="resetZoom()">⌂</div>
+            </div>
+            <svg id="worldMap"></svg>
+            <div class="tooltip" id="tooltip"></div>
+        </div>
+
+        <div class="sidebar-right">
+            <div class="sidebar-section">
+                <div class="section-header">Simulation Controls</div>
+                <div class="section-content">
+                    <div class="control-panel">
+                        <div class="btn" onclick="startSimulation()">▶️ Start</div>
+                        <div class="btn" onclick="pauseSimulation()">⏸️ Pause</div>
+                        <div class="btn" onclick="resetSimulation()">🔄 Reset</div>
+                        <div class="btn" onclick="implementLockdown()">🔒 Lockdown</div>
+                    </div>
+                    
+                    <select id="speedControl" onchange="updateSimulationSpeed(this.value)">
+                        <option value="1000">Slow</option>
+                        <option value="500" selected>Normal</option>
+                        <option value="250">Fast</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-header">Global Statistics</div>
+                <div class="section-content">
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value cases" id="totalCases">50</div>
+                            <div class="stat-label">Total Cases</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value recovered" id="totalRecovered">0</div>
+                            <div class="stat-label">Recovered</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value deaths" id="totalDeaths">0</div>
+                            <div class="stat-label">Deaths</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value day" id="dayCounter">0</div>
+                            <div class="stat-label">Day</div>
+                        </div>
+                    </div>
+
+                    <div class="parameter-slider">
+                        <div class="parameter-label">
+                            <span>R₀ (Reproduction)</span>
+                            <span id="r0Value">2.4</span>
+                        </div>
+                        <input type="range" class="slider" id="r0Slider" min="0.5" max="5.0" step="0.1" value="2.4" oninput="updateParameter('r0', this.value)">
+                    </div>
+
+                    <div class="parameter-slider">
+                        <div class="parameter-label">
+                            <span>Transmission Rate</span>
+                            <span id="transmissionValue">8%</span>
+                        </div>
+                        <input type="range" class="slider" id="transmissionSlider" min="1" max="20" step="1" value="8" oninput="updateParameter('transmission', this.value)">
+                    </div>
+
+                    <div class="parameter-slider">
+                        <div class="parameter-label">
+                            <span>Mortality Rate</span>
+                            <span id="mortalityValue">2%</span>
+                        </div>
+                        <input type="range" class="slider" id="mortalitySlider" min="0.1" max="15" step="0.1" value="2" oninput="updateParameter('mortality', this.value)">
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-header">Live News Feed</div>
+                <div class="section-content" id="newsFeed">
+                    <div class="news-item">
+                        <div>System initialized - Ready to start simulation</div>
+                        <div class="news-time">00:00:00</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log("🔍 Starting Global Pandemic Network...");
+
+        class PandemicNetwork {
+            constructor() {
+                console.log("🚀 Initializing PandemicNetwork...");
+                
+                // Country name mapping for proper display
+                this.countryNameMap = {
+                    "United States of America": "United States",
+                    "Russian Federation": "Russia",
+                    "Korea, Republic of": "South Korea",
+                    "People's Republic of China": "China",
+                    "Federal Republic of Germany": "Germany",
+                    "French Republic": "France",
+                    "United Kingdom": "United Kingdom"
+                };
+
+                // Virus parameters
+                this.virusParams = {
+                    name: "COVID-19",
+                    r0: 2.4,
+                    transmissionRate: 0.08,
+                    mortalityRate: 0.02
+                };
+
+                // Virus presets
+                this.virusPresets = {
+                    covid19: { name: "COVID-19", r0: 2.4, transmissionRate: 0.08, mortalityRate: 0.02 },
+                    influenza: { name: "Seasonal Flu", r0: 1.3, transmissionRate: 0.12, mortalityRate: 0.001 },
+                    ebola: { name: "Ebola", r0: 1.8, transmissionRate: 0.05, mortalityRate: 0.50 },
+                    sars: { name: "SARS", r0: 2.2, transmissionRate: 0.06, mortalityRate: 0.10 },
+                    measles: { name: "Measles", r0: 15.0, transmissionRate: 0.90, mortalityRate: 0.002 }
+                };
+                
+                // Transport routes
+                this.transportRoutes = {
+                    air: [
+                        { from: "Beijing", to: "Tokyo", active: true },
+                        { from: "Beijing", to: "Seoul", active: true },
+                        { from: "Tokyo", to: "Los Angeles", active: true },
+                        { from: "London", to: "New York", active: true },
+                        { from: "Paris", to: "Berlin", active: true },
+                        { from: "Moscow", to: "Beijing", active: true }
+                    ],
+                    ship: [
+                        { from: "Shanghai", to: "Los Angeles", active: true },
+                        { from: "Hamburg", to: "New York", active: true },
+                        { from: "Singapore", to: "Rotterdam", active: true }
+                    ],
+                    train: [
+                        { from: "Beijing", to: "Moscow", active: true },
+                        { from: "Paris", to: "Berlin", active: true },
+                        { from: "London", to: "Paris", active: true }
+                    ]
+                };
+
+                // Country data with real populations
+                this.countries = {
+                    "China": { population: 1411778724, cases: 50, recovered: 0, deaths: 0, lockdown: false },
+                    "United States": { population: 341814420, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "India": { population: 1407563842, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Germany": { population: 83900473, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "United Kingdom": { population: 67736802, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "France": { population: 68051000, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Japan": { population: 123294513, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Brazil": { population: 217240060, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Russia": { population: 144820423, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Canada": { population: 39742430, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Italy": { population: 58870762, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Spain": { population: 47519628, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Australia": { population: 26639777, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "South Korea": { population: 51784059, cases: 0, recovered: 0, deaths: 0, lockdown: false },
+                    "Netherlands": { population: 17590672, cases: 0, recovered: 0, deaths: 0, lockdown: false }
+                };
+                
+                // Cities with neighborhoods
+                this.cities = {
+                    "Beijing": { 
+                        country: "China", lat: 39.9042, lng: 116.4074, cases: 50, infected: true,
+                        neighborhoods: [
+                            { name: "Chaoyang", population: 3545137, cases: 30, lat: 39.9219, lng: 116.4434 },
+                            { name: "Haidian", population: 3280670, cases: 20, lat: 39.9589, lng: 116.2987 },
+                            { name: "Fengtai", population: 2019764, cases: 0, lat: 39.8567, lng: 116.2865 }
+                        ]
+                    },
+                    "Shanghai": { country: "China", lat: 31.2304, lng: 121.4737, cases: 0, infected: false },
+                    "New York": { country: "United States", lat: 40.7128, lng: -74.0060, cases: 0, infected: false },
+                    "Los Angeles": { country: "United States", lat: 34.0522, lng: -118.2437, cases: 0, infected: false },
+                    "London": { country: "United Kingdom", lat: 51.5074, lng: -0.1278, cases: 0, infected: false },
+                    "Tokyo": { country: "Japan", lat: 35.6762, lng: 139.6503, cases: 0, infected: false },
+                    "Paris": { country: "France", lat: 48.8566, lng: 2.3522, cases: 0, infected: false },
+                    "Berlin": { country: "Germany", lat: 52.5200, lng: 13.4050, cases: 0, infected: false },
+                    "Moscow": { country: "Russia", lat: 55.7558, lng: 37.6176, cases: 0, infected: false },
+                    "Sydney": { country: "Australia", lat: -33.8688, lng: 151.2093, cases: 0, infected: false },
+                    "Singapore": { country: "Singapore", lat: 1.3521, lng: 103.8198, cases: 0, infected: false },
+                    "Seoul": { country: "South Korea", lat: 37.5665, lng: 126.9780, cases: 0, infected: false },
+                    "Hamburg": { country: "Germany", lat: 53.5511, lng: 9.9937, cases: 0, infected: false },
+                    "Rotterdam": { country: "Netherlands", lat: 51.9225, lng: 4.4792, cases: 0, infected: false }
+                };
+                
+                this.geoData = null;
+                this.svg = null;
+                this.projection = null;
+                this.zoom = null;
+                this.tooltip = d3.select("#tooltip");
+                this.running = false;
+                this.day = 0;
+                this.simulationSpeed = 500;
+                this.currentZoomLevel = 1;
+                this.showTransport = { air: true, ship: true, train: false };
+                
+                // Initialize
+                this.setupMap();
+                this.startClock();
+                this.loadWorldMap();
+                
+                console.log("✅ PandemicNetwork initialized");
+            }
+            
+            setupMap() {
+                const container = document.querySelector('.map-container');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                this.svg = d3.select("#worldMap")
+                    .attr("width", width)
+                    .attr("height", height);
+                
+                this.projection = d3.geoNaturalEarth1()
+                    .scale(150)
+                    .translate([width / 2, height / 2]);
+                
+                this.zoom = d3.zoom()
+                    .scaleExtent([0.5, 20])
+                    .on("zoom", (event) => {
+                        this.currentZoomLevel = event.transform.k;
+                        this.updateZoomLevel();
+                        this.svg.select(".map-group").attr("transform", event.transform);
+                    });
+                
+                this.svg.call(this.zoom);
+                this.svg.append("g").attr("class", "map-group");
+            }
+            
+            updateZoomLevel() {
+                const zoomEl = document.getElementById('zoomLevel');
+                if (zoomEl) {
+                    if (this.currentZoomLevel < 2) {
+                        zoomEl.textContent = 'Zoom: Global';
+                    } else if (this.currentZoomLevel < 5) {
+                        zoomEl.textContent = 'Zoom: Country';
+                    } else {
+                        zoomEl.textContent = 'Zoom: City';
+                    }
+                }
+            }
+            
+            startClock() {
+                setInterval(() => {
+                    const timeEl = document.getElementById('currentTime');
+                    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString();
+                }, 1000);
+            }
+            
+            loadWorldMap() {
+                console.log("🌍 Loading world map...");
+                
+                fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log("✅ Map data loaded");
+                        this.geoData = data;
+                        this.renderMap();
+                    })
+                    .catch(error => {
+                        console.log("⚠️ Using fallback map");
+                        this.renderFallbackMap();
+                    })
+                    .finally(() => {
+                        document.getElementById('loading').style.display = 'none';
+                    });
+            }
+            
+            getCountryName(feature) {
+                const name = feature.properties.ADMIN || feature.properties.NAME || feature.properties.NAME_EN;
+                return this.countryNameMap[name] || name;
+            }
+            
+            renderMap() {
+                const mapGroup = this.svg.select(".map-group");
+                mapGroup.selectAll("*").remove();
+                
+                const path = d3.geoPath().projection(this.projection);
+                
+                // Draw countries
+                mapGroup.selectAll(".country")
+                    .data(this.geoData.features)
+                    .enter()
+                    .append("path")
+                    .attr("class", "country")
+                    .attr("d", path)
+                    .attr("fill", (d) => {
+                        const name = this.getCountryName(d);
+                        const data = this.countries[name];
+                        if (data && data.cases > 0) {
+                            return data.lockdown ? "#8B0000" : "#DC143C";
+                        }
+                        return "#2c5aa0";
+                    })
+                    .attr("stroke", (d) => {
+                        const name = this.getCountryName(d);
+                        const data = this.countries[name];
+                        return (data && data.lockdown) ? "#FFD700" : "#34495e";
+                    })
+                    .on("mouseover", (event, d) => {
+                        const name = this.getCountryName(d);
+                        const data = this.countries[name];
+                        
+                        this.tooltip
+                            .style("opacity", 1)
+                            .html(`
+                                <strong>${name}</strong><br/>
+                                ${data ? `
+                                    Population: ${data.population.toLocaleString()}<br/>
+                                    Cases: ${data.cases.toLocaleString()}<br/>
+                                    Recovered: ${data.recovered.toLocaleString()}<br/>
+                                    Deaths: ${data.deaths.toLocaleString()}<br/>
+                                    Status: ${data.lockdown ? '🔒 LOCKDOWN' : (data.cases > 0 ? '🔴 INFECTED' : '🟢 SAFE')}
+                                ` : 'No data available'}
+                            `)
+                            .style("left", (event.pageX + 10) + "px")
+                            .style("top", (event.pageY - 10) + "px");
+                    })
+                    .on("mouseout", () => {
+                        this.tooltip.style("opacity", 0);
+                    });
+                
+                this.renderTransportRoutes();
+                this.renderCities();
+            }
+            
+            renderFallbackMap() {
+                const mapGroup = this.svg.select(".map-group");
+                mapGroup.selectAll("*").remove();
+                
+                const width = parseFloat(this.svg.attr("width"));
+                const height = parseFloat(this.svg.attr("height"));
+                
+                // Draw regions
+                const regions = [
+                    { name: "China", x: width * 0.75, y: height * 0.35, countries: ["China"] },
+                    { name: "Europe", x: width * 0.5, y: height * 0.25, countries: ["Germany", "United Kingdom", "France", "Italy", "Spain"] },
+                    { name: "North America", x: width * 0.25, y: height * 0.3, countries: ["United States", "Canada"] },
+                    { name: "Asia", x: width * 0.7, y: height * 0.4, countries: ["Japan", "South Korea", "India"] },
+                    { name: "Others", x: width * 0.6, y: height * 0.6, countries: ["Brazil", "Australia", "Russia"] }
+                ];
+                
+                regions.forEach(region => {
+                    const totalCases = region.countries.reduce((sum, country) => {
+                        return sum + (this.countries[country] ? this.countries[country].cases : 0);
+                    }, 0);
+                    
+                    const isInfected = totalCases > 0;
+                    
+                    mapGroup.append("circle")
+                        .attr("cx", region.x)
+                        .attr("cy", region.y)
+                        .attr("r", 60)
+                        .attr("fill", isInfected ? "#DC143C" : "#2c5aa0")
+                        .attr("stroke", "#34495e")
+                        .attr("stroke-width", 2)
+                        .attr("opacity", 0.8)
+                        .style("cursor", "pointer")
+                        .on("mouseover", (event) => {
+                            this.tooltip
+                                .style("opacity", 1)
+                                .html(`
+                                    <strong>${region.name}</strong><br/>
+                                    Countries: ${region.countries.join(", ")}<br/>
+                                    Total Cases: ${totalCases.toLocaleString()}
+                                `)
+                                .style("left", (event.pageX + 10) + "px")
+                                .style("top", (event.pageY - 10) + "px");
+                        })
+                        .on("mouseout", () => {
+                            this.tooltip.style("opacity", 0);
+                        });
+                    
+                    mapGroup.append("text")
+                        .attr("x", region.x)
+                        .attr("y", region.y)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#ffffff")
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .text(region.name);
+                });
+                
+                this.renderTransportRoutes();
+                this.renderCities();
+            }
+            
+            renderTransportRoutes() {
+                const mapGroup = this.svg.select(".map-group");
+                mapGroup.selectAll(".transport-route").remove();
+                
+                Object.entries(this.transportRoutes).forEach(([type, routes]) => {
+                    if (!this.showTransport[type]) return;
+                    
+                    routes.forEach(route => {
+                        const fromCity = this.cities[route.from];
+                        const toCity = this.cities[route.to];
+                        
+                        if (fromCity && toCity) {
+                            const fromCoords = this.projection([fromCity.lng, fromCity.lat]);
+                            const toCoords = this.projection([toCity.lng, toCity.lat]);
+                            
+                            if (fromCoords && toCoords) {
+                                mapGroup.append("line")
+                                    .attr("class", `transport-route ${type}-route`)
+                                    .attr("x1", fromCoords[0])
+                                    .attr("y1", fromCoords[1])
+                                    .attr("x2", toCoords[0])
+                                    .attr("y2", toCoords[1])
+                                    .style("opacity", route.active ? 0.7 : 0.3);
+                            }
+                        }
+                    });
+                });
+            }
+            
+            renderCities() {
+                const mapGroup = this.svg.select(".map-group");
+                mapGroup.selectAll(".city-marker").remove();
+                mapGroup.selectAll(".city-label").remove();
+                
+                Object.entries(this.cities).forEach(([name, city]) => {
+                    const coords = this.projection([city.lng, city.lat]);
+                    
+                    if (coords) {
+                        const size = city.infected ? 8 : 5;
+                        
+                        mapGroup.append("circle")
+                            .attr("class", city.infected ? "city-marker city-infected" : "city-marker")
+                            .attr("cx", coords[0])
+                            .attr("cy", coords[1])
+                            .attr("r", size)
+                            .on("mouseover", (event) => {
+                                const totalPop = city.neighborhoods ? 
+                                    city.neighborhoods.reduce((sum, n) => sum + n.population, 0) : 0;
+                                
+                                this.tooltip
+                                    .style("opacity", 1)
+                                    .html(`
+                                        <strong>${name}</strong><br/>
+                                        Country: ${city.country}<br/>
+                                        Cases: ${city.cases.toLocaleString()}<br/>
+                                        Population: ${totalPop.toLocaleString()}<br/>
+                                        Status: ${city.infected ? "🔴 INFECTED" : "🟢 SAFE"}
+                                    `)
+                                    .style("left", (event.pageX + 10) + "px")
+                                    .style("top", (event.pageY - 10) + "px");
+                            })
+                            .on("mouseout", () => {
+                                this.tooltip.style("opacity", 0);
+                            });
+                        
+                        // City labels at higher zoom
+                        if (this.currentZoomLevel > 2 || city.infected) {
+                            mapGroup.append("text")
+                                .attr("class", "city-label")
+                                .attr("x", coords[0])
+                                .attr("y", coords[1] - size - 5)
+                                .attr("text-anchor", "middle")
+                                .attr("fill", "#ffffff")
+                                .attr("font-size", "9px")
+                                .attr("font-weight", "bold")
+                                .attr("stroke", "#000000")
+                                .attr("stroke-width", 0.3)
+                                .text(name);
+                        }
+                    }
+                });
+                
+                // Render neighborhoods at high zoom
+                if (this.currentZoomLevel > 8) {
+                    this.renderNeighborhoods();
+                }
+            }
+            
+            renderNeighborhoods() {
+                const mapGroup = this.svg.select(".map-group");
+                mapGroup.selectAll(".neighborhood").remove();
+                
+                Object.entries(this.cities).forEach(([cityName, city]) => {
+                    if (!city.neighborhoods) return;
+                    
+                    city.neighborhoods.forEach(neighborhood => {
+                        const coords = this.projection([neighborhood.lng, neighborhood.lat]);
+                        
+                        if (coords) {
+                            const size = Math.max(3, Math.sqrt(neighborhood.population / 100000) * 4);
+                            
+                            mapGroup.append("circle")
+                                .attr("class", "neighborhood")
+                                .attr("cx", coords[0])
+                                .attr("cy", coords[1])
+                                .attr("r", size)
+                                .attr("fill", neighborhood.cases > 0 ? "#e74c3c" : "#2ecc71")
+                                .attr("opacity", 0.7)
+                                .on("mouseover", (event) => {
+                                    this.tooltip
+                                        .style("opacity", 1)
+                                        .html(`
+                                            <strong>${neighborhood.name}</strong><br/>
+                                            City: ${cityName}<br/>
+                                            Population: ${neighborhood.population.toLocaleString()}<br/>
+                                            Cases: ${neighborhood.cases.toLocaleString()}<br/>
+                                            Status: ${neighborhood.cases > 0 ? "🔴 INFECTED" : "🟢 SAFE"}
+                                        `)
+                                        .style("left", (event.pageX + 10) + "px")
+                                        .style("top", (event.pageY - 10) + "px");
+                                })
+                                .on("mouseout", () => {
+                                    this.tooltip.style("opacity", 0);
+                                });
+                        }
+                    });
+                });
+            }
+            
+            loadVirusPreset(virusType) {
+                const preset = this.virusPresets[virusType];
+                if (preset) {
+                    this.virusParams = { ...preset };
+                    
+                    // Update sliders
+                    document.getElementById('r0Slider').value = preset.r0;
+                    document.getElementById('transmissionSlider').value = preset.transmissionRate * 100;
+                    document.getElementById('mortalitySlider').value = preset.mortalityRate * 100;
+                    
+                    // Update displays
+                    document.getElementById('r0Value').textContent = preset.r0;
+                    document.getElementById('transmissionValue').textContent = (preset.transmissionRate * 100) + '%';
+                    document.getElementById('mortalityValue').textContent = (preset.mortalityRate * 100) + '%';
+                    
+                    this.addNews(`🦠 ${preset.name} loaded - R₀: ${preset.r0}`);
+                }
+            }
+            
+            toggleTransport(type) {
+                this.showTransport[type] = document.getElementById(`show${type.charAt(0).toUpperCase() + type.slice(1)}Routes`).checked;
+                this.renderTransportRoutes();
+                this.addNews(`${type.toUpperCase()} routes ${this.showTransport[type] ? 'enabled' : 'disabled'}`);
+            }
+            
+            addNews(message) {
+                const feed = document.getElementById('newsFeed');
+                if (feed) {
+                    const newsItem = document.createElement('div');
+                    newsItem.className = 'news-item';
+                    newsItem.innerHTML = `
+                        <div>${message}</div>
+                        <div class="news-time">${new Date().toLocaleTimeString()}</div>
+                    `;
+                    feed.insertBefore(newsItem, feed.firstChild);
+                    
+                    while (feed.children.length > 8) {
+                        feed.removeChild(feed.lastChild);
+                    }
+                }
+            }
+            
+            updateOutbreakList() {
+                const infectedCountries = Object.entries(this.countries)
+                    .filter(([name, data]) => data.cases > 0)
+                    .sort((a, b) => b[1].cases - a[1].cases);
+                
+                const listEl = document.getElementById('outbreakList');
+                if (listEl && infectedCountries.length > 0) {
+                    listEl.innerHTML = infectedCountries.map(([name, data]) => `
+                        <div class="news-item">
+                            <div>${name} - ${data.cases.toLocaleString()} cases</div>
+                            <div class="news-time">Day ${this.day}</div>
+                        </div>
+                    `).join('');
+                }
+            }
+            
+            startSimulation() {
+                if (this.running) return;
+                
+                this.running = true;
+                this.addNews(`🚀 ${this.virusParams.name} simulation started`);
+                
+                const simulate = () => {
+                    if (!this.running) return;
+                    
+                    this.day++;
+                    this.simulateSpread();
+                    this.updateStatistics();
+                    
+                    setTimeout(simulate, this.simulationSpeed);
+                };
+                
+                simulate();
+            }
+            
+            simulateSpread() {
+                Object.entries(this.countries).forEach(([countryName, data]) => {
+                    if (data.cases > 0) {
+                        const lockdownEffect = data.lockdown ? 0.3 : 1.0;
+                        const growthRate = this.virusParams.r0 * this.virusParams.transmissionRate * lockdownEffect / 14;
+                        const growth = Math.floor(data.cases * growthRate);
+                        
+                        data.cases += growth;
+                        
+                        // Recoveries
+                        const recoveries = Math.floor(data.cases * 0.05);
+                        data.cases -= recoveries;
+                        data.recovered += recoveries;
+                        
+                        // Deaths
+                        const deaths = Math.floor(data.cases * this.virusParams.mortalityRate);
+                        data.cases -= deaths;
+                        data.deaths += deaths;
+                        
+                        // International spread
+                        if (data.cases > 100 && !data.lockdown) {
+                            this.simulateTransportSpread(countryName);
+                        }
+                        
+                        // City spread
+                        this.simulateCitySpread(countryName);
+                    }
+                });
+                
+                // Re-render
+                if (this.geoData) {
+                    this.renderMap();
+                } else {
+                    this.renderFallbackMap();
+                }
+                
+                this.updateOutbreakList();
+            }
+            
+            simulateTransportSpread(sourceCountry) {
+                Object.entries(this.cities).forEach(([cityName, city]) => {
+                    if (city.country === sourceCountry && city.infected) {
+                        Object.entries(this.transportRoutes).forEach(([mode, routes]) => {
+                            if (!this.showTransport[mode]) return;
+                            
+                            routes.forEach(route => {
+                                if (route.from === cityName && route.active && Math.random() < 0.1) {
+                                    this.spreadToCity(route.to, mode);
+                                }
+                            });
+                        });
+                    }
+                });
+            }
+            
+            spreadToCity(cityName, transportMode) {
+                const city = this.cities[cityName];
+                if (city && !city.infected) {
+                    city.infected = true;
+                    city.cases = Math.floor(Math.random() * 10) + 1;
+                    
+                    const countryData = this.countries[city.country];
+                    if (countryData) {
+                        countryData.cases += city.cases;
+                    }
+                    
+                    // Infect neighborhoods
+                    if (city.neighborhoods) {
+                        city.neighborhoods[0].cases = city.cases;
+                    }
+                    
+                    this.addNews(`✈️ Virus spreads to ${cityName} via ${transportMode}`);
+                }
+            }
+            
+            simulateCitySpread(countryName) {
+                Object.entries(this.cities).forEach(([cityName, city]) => {
+                    if (city.country === countryName && city.infected && city.neighborhoods) {
+                        let totalCases = 0;
+                        
+                        city.neighborhoods.forEach(neighborhood => {
+                            if (neighborhood.cases > 0) {
+                                const growth = Math.floor(neighborhood.cases * 0.1);
+                                neighborhood.cases += growth;
+                                totalCases += neighborhood.cases;
+                                
+                                // Spread to other neighborhoods
+                                if (neighborhood.cases > 20 && Math.random() < 0.2) {
+                                    const uninfected = city.neighborhoods.filter(n => n.cases === 0);
+                                    if (uninfected.length > 0) {
+                                        const target = uninfected[0];
+                                        target.cases = Math.floor(Math.random() * 5) + 1;
+                                        this.addNews(`🏘️ Spreads to ${target.name}, ${cityName}`);
+                                    }
+                                }
+                            }
+                        });
+                        
+                        city.cases = Math.max(totalCases, city.cases);
+                    }
+                });
+            }
+            
+            updateStatistics() {
+                const totals = Object.values(this.countries).reduce((acc, data) => {
+                    acc.cases += data.cases;
+                    acc.recovered += data.recovered;
+                    acc.deaths += data.deaths;
+                    return acc;
+                }, { cases: 0, recovered: 0, deaths: 0 });
+                
+                document.getElementById('totalCases').textContent = totals.cases.toLocaleString();
+                document.getElementById('totalRecovered').textContent = totals.recovered.toLocaleString();
+                document.getElementById('totalDeaths').textContent = totals.deaths.toLocaleString();
+                document.getElementById('dayCounter').textContent = this.day;
+            }
+        }
+
+        // Global variable
+        let network = null;
+
+        // Control functions
+        function startSimulation() {
+            if (network) network.startSimulation();
+        }
+
+        function pauseSimulation() {
+            if (network) {
+                network.running = !network.running;
+                network.addNews(network.running ? "▶️ Resumed" : "⏸️ Paused");
+            }
+        }
+
+        function resetSimulation() {
+            if (network) {
+                network.running = false;
+                network.day = 0;
+                
+                // Reset countries
+                Object.keys(network.countries).forEach(country => {
+                    network.countries[country].cases = 0;
+                    network.countries[country].recovered = 0;
+                    network.countries[country].deaths = 0;
+                    network.countries[country].lockdown = false;
+                });
+                network.countries["China"].cases = 50;
+                
+                // Reset cities
+                Object.keys(network.cities).forEach(cityName => {
+                    network.cities[cityName].infected = false;
+                    network.cities[cityName].cases = 0;
+                    
+                    if (network.cities[cityName].neighborhoods) {
+                        network.cities[cityName].neighborhoods.forEach(n => n.cases = 0);
+                    }
+                });
+                
+                network.cities["Beijing"].infected = true;
+                network.cities["Beijing"].cases = 50;
+                if (network.cities["Beijing"].neighborhoods) {
+                    network.cities["Beijing"].neighborhoods[0].cases = 30;
+                    network.cities["Beijing"].neighborhoods[1].cases = 20;
+                }
+                
+                // Reset routes
+                Object.values(network.transportRoutes).forEach(routes => {
+                    routes.forEach(route => route.active = true);
+                });
+                
+                network.updateStatistics();
+                network.updateOutbreakList();
+                
+                if (network.geoData) {
+                    network.renderMap();
+                } else {
+                    network.renderFallbackMap();
+                }
+                
+                network.addNews("🔄 Simulation reset");
+            }
+        }
+
+        function implementLockdown() {
+            if (network) {
+                let lockdownCount = 0;
+                Object.entries(network.countries).forEach(([name, data]) => {
+                    const rate = data.cases / data.population;
+                    if (rate > 0.0001 && !data.lockdown) {
+                        data.lockdown = true;
+                        lockdownCount++;
+                        
+                        // Suspend routes
+                        Object.entries(network.cities).forEach(([cityName, city]) => {
+                            if (city.country === name) {
+                                Object.values(network.transportRoutes).forEach(routes => {
+                                    routes.forEach(route => {
+                                        if (route.from === cityName || route.to === cityName) {
+                                            route.active = false;
+                                        }
+                                    });
+                                });
+                            }
+                        });
+                    }
+                });
+                
+                if (lockdownCount > 0) {
+                    network.addNews(`🔒 Lockdown in ${lockdownCount} countries`);
+                    if (network.geoData) {
+                        network.renderMap();
+                    } else {
+                        network.renderFallbackMap();
+                    }
+                } else {
+                    network.addNews("🔒 No lockdown needed");
+                }
+            }
+        }
+
+        function loadVirusPreset(virusType) {
+            if (network) network.loadVirusPreset(virusType);
+        }
+
+        function toggleTransport(type) {
+            if (network) network.toggleTransport(type);
+        }
+
+        function updateSimulationSpeed(speed) {
+            if (network) {
+                network.simulationSpeed = parseInt(speed);
+            }
+        }
+
+        function zoomIn() {
+            if (network && network.svg) {
+                network.svg.transition().call(network.zoom.scaleBy, 1.5);
+            }
+        }
+
+        function zoomOut() {
+            if (network && network.svg) {
+                network.svg.transition().call(network.zoom.scaleBy, 1/1.5);
+            }
+        }
+
+        function resetZoom() {
+            if (network && network.svg) {
+                network.svg.transition().call(network.zoom.transform, d3.zoomIdentity);
+            }
+        }
+
+        function updateParameter(param, value) {
+            const element = document.getElementById(param + 'Value');
+            if (element) {
+                if (param === 'transmission' || param === 'mortality') {
+                    element.textContent = value + '%';
+                } else {
+                    element.textContent = value;
+                }
+            }
+            
+            if (network && network.virusParams) {
+                switch(param) {
+                    case 'r0':
+                        network.virusParams.r0 = parseFloat(value);
+                        break;
+                    case 'transmission':
+                        network.virusParams.transmissionRate = parseFloat(value) / 100;
+                        break;
+                    case 'mortality':
+                        network.virusParams.mortalityRate = parseFloat(value) / 100;
+                        break;
+                }
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("🌍 Initializing...");
+            
+            try {
+                network = new PandemicNetwork();
+                window.network = network;
+                console.log("✅ Ready!");
+                
+                setTimeout(() => {
+                    network.loadVirusPreset('covid19');
+                }, 500);
+                
+            } catch (error) {
+                console.error("❌ Error:", error);
+                document.getElementById('loading').innerHTML = '❌ Error loading';
+            }
+        });
+
+        console.log("📋 Script loaded");
+    </script>
+</body>
+</html>
